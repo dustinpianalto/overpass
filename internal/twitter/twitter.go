@@ -4,19 +4,24 @@ import (
 	"log"
 
 	"github.com/dghubble/go-twitter/twitter"
-	oauth "github.com/dustinpianalto/overpass/internal/oauth2"
+	"github.com/dustinpianalto/overpass/internal/oauth1"
 )
 
+type Tweet struct {
+	twitter.Tweet
+}
+
 func Connect() *twitter.Client {
-	httpClient := oauth.GetClient()
+	httpClient := oauth1.GetClient()
 	return twitter.NewClient(httpClient)
 }
 
-func StartUserScanner(client *twitter.Client, userID string) (chan *twitter.Tweet, *twitter.Stream) {
+func StartUserScanner(client *twitter.Client, userID string, tweetChan chan *Tweet) *twitter.Stream {
 	demux := twitter.NewSwitchDemux()
-	tweetChan := make(chan *twitter.Tweet, 10)
 	demux.Tweet = func(tweet *twitter.Tweet) {
-		tweetChan <- tweet
+		if tweet.User.IDStr == userID {
+			tweetChan <- &Tweet{*tweet}
+		}
 	}
 	demux.StatusDeletion = func(deletion *twitter.StatusDeletion) {
 		log.Printf("%#v\n", deletion)
@@ -40,5 +45,5 @@ func StartUserScanner(client *twitter.Client, userID string) (chan *twitter.Twee
 		log.Println(err)
 	}
 	go demux.HandleChan(stream.Messages)
-	return tweetChan, stream
+	return stream
 }
